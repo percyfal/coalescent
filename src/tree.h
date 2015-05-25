@@ -11,14 +11,18 @@
 #ifndef TREE_H_INCLUDED
 #define TREE_H_INCLUDED
 
+typedef int boolean;
+#define TRUE 1
+#define FALSE 0
 
-struct node {
-	struct node *parent;
-	struct node *left;
-	struct node *right;
+struct Node {
+	struct Node *parent;
+	struct Node *left;
+	struct Node *right;
 	double time;
-	size_t mutations;
-	size_t id;
+	unsigned int mutations;
+	unsigned int id;
+	boolean visited;
 };
 
 #endif
