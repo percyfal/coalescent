@@ -23,6 +23,10 @@ struct Node {
 	unsigned int mutations;
 	unsigned int id;
 	boolean visited;
+	char *state;
 };
+
+
+	
 
 #endif

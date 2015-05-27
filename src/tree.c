@@ -12,9 +12,10 @@
 #include <time.h>
 /* See http://stat-www.berkeley.edu/classes/s243/rmath.html for instructions on compiling standalone */
 // #define MATHLIB_STANDALONE
-#include <R.h>
-#include <Rmath.h>
-#include <Rinternals.h>
+#include "R.h"
+#include "Rmath.h"
+#include "Rinternals.h"
+
 #include "tree.h"
 
 /* http://stackoverflow.com/questions/14768230/malloc-for-struct-and-pointer-in-c */
@@ -25,7 +26,7 @@
  * 
  * @return Node
  */
-struct Node *new_node (unsigned int id)
+struct Node *new_node (unsigned int id, unsigned int L)
 {
 	struct Node *retval = malloc (sizeof (struct Node));
 	if (retval == NULL)
@@ -40,23 +41,43 @@ struct Node *new_node (unsigned int id)
 	retval->time = 0.0;
 	retval->id = id;
 	retval->visited = FALSE;
+	// here we go with chars again - there must be an easier way to do
+	// this
+	retval->state = malloc(sizeof(char)*(L+1));
+	char state [L];
+	strcpy(state, "");
+	for (int i=0; i<L; i++)
+		strcat(state, "0");
+	strcpy(retval->state, state);
 	return retval;
 }
 /** 
- * del_node - delete a Node
+ * delete_node - delete a Node
  * 
  * @param n 
  */
-void del_node (struct Node *n) 
+void delete_node (struct Node *n) 
 {
 	if (n != NULL) {
-		free (n->parent);
+		// n->parent = NULL;
+		//
+		// freeing n->parent from a leaf will also
+		// free the parent as n->parent itself is pointing to a
+		// pointer... so don't do this
+		// free (n->parent);
 		free (n->left);
 		free (n->right);
+		free (n->state);
 		free (n);
 	}
 }
-
+/** 
+ * visit_node - a depth-first traversal of the tree
+ * 
+ * @param n 
+ * 
+ * @return 
+ */
 struct Node *visit_node (struct Node *n)
 {
 	n->visited = TRUE;
@@ -72,6 +93,13 @@ struct Node *visit_node (struct Node *n)
 		return NULL;
 	}
 }
+/** 
+ * unvisit_node - mark a node as unvisited
+ * 
+ * @param n 
+ * 
+ * @return 
+ */
 struct Node *unvisit_node (struct Node *n)
 {
 	n->visited = FALSE;
@@ -87,6 +115,7 @@ struct Node *unvisit_node (struct Node *n)
 		return NULL;
 	}
 }
+//struct Node
 
 
 /** 
@@ -97,19 +126,11 @@ struct Node *unvisit_node (struct Node *n)
 void print_node(struct Node *n)
 {
 	printf("Node id: %i", n->id);
-	if (n->parent == NULL)
-		printf(", parent id: %p", n->parent);
-	else
-		printf(", parent id: %i", n->parent->id);
-	if (n->left == NULL)
-		printf(", left id: %p", n->left);
-	else
-		printf(", left id: %i", n->left->id);
-	if (n->right == NULL)
-		printf(", right id: %p", n->right);
-	else
-		printf(", right id: %i", n->right->id);
-	printf(", mutations: %i, time: %.2f, visited: %i\n", n->mutations, n->time, n->visited);
+	(n->parent == NULL) ? printf(", parent id: %p", n->parent) : printf(", parent id: %i", n->parent->id);
+	(n->left == NULL) ? printf(", left id: %p", n->left) : printf(", left id: %i", n->left->id);
+	(n->right == NULL) ? printf(", right id: %p", n->right) : printf(", right id: %i", n->right->id);
+	printf(", mutations: %i, time: %.2f, visited: %i\t", n->mutations, n->time, n->visited);
+	printf("%s\n", n->state);
 }
 /** 
  * coalesce - perform a coalescent event
@@ -184,7 +205,8 @@ boolean isroot(struct Node *n)
  * reset_tree - mark all nodes as unvisited
  * 
  * @param n - Node
- */void reset_tree(struct Node *n)
+ */
+void reset_tree(struct Node *n)
 {
 	while (n != NULL) {
 		if (n != NULL) {
@@ -193,6 +215,39 @@ boolean isroot(struct Node *n)
 		}
 	}
 }
+/** 
+ * remove_tree - free up memory
+ *
+ * @param n - Node
+ */
+void remove_tree(struct Node *n)
+{
+	boolean left = FALSE;
+	while (n != NULL) {
+		if (n->left != NULL) {
+			left = TRUE;
+			n = n->left;
+		} else if (n->right != NULL) {
+			left = FALSE;
+			n = n->right;
+		} else if (n->parent != NULL) {
+			n = n->parent;
+			if (left) {
+				delete_node(n->left);
+				n->left = NULL;
+			} else {
+				delete_node(n->right);
+				n->right = NULL;
+			}
+		}
+		else {
+			delete_node(n);
+			n = NULL;
+		}
+	}
+}
+
+
 /** 
  * segregating_sites - calculate the number of segregating sites
  * 
@@ -204,12 +259,12 @@ int segregating_sites(struct Node *n)
 {
 	int sites = 0;
 	reset_tree(n);
-	Rprintf("calculating segregating sites\n");
+	//Rprintf("calculating segregating sites\n");
 	while (n != NULL) {
 		if (n != NULL) {
-			Rprintf("id: %i, mutations: %i, visited: %i\n", n->id, n->mutations, n->visited);
+			//Rprintf("id: %i, mutations: %i, visited: %i\n", n->id, n->mutations, n->visited);
 			if (!n->visited) {
-				Rprintf("Adding %i mutations from id %i\n", n->mutations, n->id);
+				//Rprintf("Adding %i mutations from id %i\n", n->mutations, n->id);
 				n->visited = TRUE;
 				sites += n->mutations;
 			}
@@ -231,7 +286,7 @@ double total_branch_length(struct Node *n)
 {
 	double tbl = 0.0;
 	reset_tree(n);
-	Rprintf("calculating tbl...\n");
+	//Rprintf("calculating tbl...\n");
 	while (n != NULL) {
 		if (n != NULL) {
 			//Rprintf("id: %i, tbl: %.3f, visited: %i\n", n->id, n->time, n->visited);
@@ -260,8 +315,16 @@ double tmrca(struct Node *n)
 	else
 		printf ("ERROR: %i is not root!\n", n->id);
 }
-
-struct Node *coalescent_tree(unsigned int N, double theta)
+/** 
+ * 
+ * 
+ * @param N number of samples
+ * @param theta mutation rate
+ * @param L number of sites
+ * 
+ * @return root node
+ */
+struct Node *coalescent_tree(unsigned int N, double theta, unsigned int L)
 {
 	// http://users.stat.umn.edu/~geyer/rc/
 	GetRNGstate();
@@ -271,14 +334,13 @@ struct Node *coalescent_tree(unsigned int N, double theta)
 	n_nodes = 2*N - 1;
 	struct Node *nodes[n_nodes];
 	for (k=0; k < n_nodes; k++)
-		nodes[k] = new_node(k);
+		nodes[k] = new_node(k, L);
 	
 	double rate, Ti, Ttot;
 	Ttot = 0.0;
 	i = j = N;
 	while (i > 1) {
 		// Set the coalescence time
-		Rprintf("i: %i\n", i);
 		rate = i * (i - 1) / 2.0;
 		/* rate is in unit 1/s; want unit s so invert */
 		Ti = rexp(1/rate);
@@ -287,12 +349,14 @@ struct Node *coalescent_tree(unsigned int N, double theta)
 
 		// Make a number of mutations and sprinkle them out
 		int n_mut, l;
-		n_mut = (int) rpois((double) (theta / 2 * Ti));
+		// Remember; we need to multiply rate also by the number of
+		// branches; otherwise we're only generating a number of
+		// mutations proportional to TMRCA, not TBL
+		n_mut = (int) rpois((double) (theta / 2 * Ti * i));
 		for (k=0; k<n_mut; k++) {
 			l = (int) runif(0.0, (double) i);
 			nodes[l]->mutations++;
 		}
-		Rprintf("Time (tau) %.2f, time %.2f, n mutations: %i\n", Ti, Ttot, n_mut);
 
 		// Note that the coalescent event can be performed after
 		// setting the time and placing mutations as we know the id of
@@ -301,6 +365,9 @@ struct Node *coalescent_tree(unsigned int N, double theta)
 		i--;
 		j++;
 	}
+	/* for (k=0; k < n_nodes; k++) { */
+	/* 	print_node(nodes[k]); */
+	/* } */
 	PutRNGstate();
 	for (k=0; k < n_nodes; k++) {
 		if (isroot(nodes[k]))
@@ -308,15 +375,22 @@ struct Node *coalescent_tree(unsigned int N, double theta)
 	}
 }
 
-	
-SEXP tree(SEXP N, SEXP theta)
+/** 
+ * tree - get the coalescent
+ * 
+ * @param N 
+ * @param theta 
+ * 
+ * @return 
+ */	
+SEXP tree(SEXP N, SEXP theta, SEXP L)
 {
 	SEXP ans;
 	SEXP TMRCA = PROTECT(allocVector(REALSXP, 1));
 	SEXP TBL = PROTECT(allocVector(REALSXP, 1));
 	SEXP NMUT = PROTECT(allocVector(INTSXP, 1));
 	struct Node *n;
-	n = coalescent_tree(asInteger(N), asReal(theta));
+	n = coalescent_tree(asInteger(N), asReal(theta), asInteger(L));
 	ans = PROTECT(allocVector(VECSXP, 3));
 	NMUT = ScalarInteger(segregating_sites(n));
 	TMRCA = ScalarReal(tmrca(n));
@@ -325,64 +399,7 @@ SEXP tree(SEXP N, SEXP theta)
 	SET_VECTOR_ELT(ans, 1, TBL);
 	SET_VECTOR_ELT(ans, 2, NMUT);
     UNPROTECT(4);
+	// Clean up memory
+	remove_tree(n);
 	return (ans);
 }
-
-/* int main(int argc, const char *argv) */
-/* { */
-/* 	time_t tt; */
-/* 	tt = time(NULL); */
-	
-/* 	set_seed(tt,77911);   */
-/* 	int k, n_nodes; */
-/* 	unsigned int i, j, N; */
-/* 	double theta; */
-	
-/* 	// samples */
-/* 	N = 10; */
-/* 	i = j = N; */
-/* 	// Remember: E_TMRCA = 2(1-1/n), so in range [1,2). Theta = 1.0 */
-/* 	// will then give 1-2 mutations on average which may be too low */
-/* 	theta = 10.0; */
-/* 	// there are 2N-2 branches (rooted tree), which implies 2N-1 nodes */
-/* 	n_nodes = 2*N - 1; */
-/* 	struct Node *nodes[n_nodes]; */
-/* 	for (k=0; k < n_nodes; k++)  */
-/* 		nodes[k] = new_node(k); */
-
-/* 	double rate, Ti, Ttot; */
-/* 	Ttot = 0.0; */
-/* 	while (i > 1) { */
-/* 		// Set the coalescence time */
-/* 		rate = i * (i - 1) / 2.0; */
-/* 		/\* rate is in unit 1/s; want unit s so invert *\/ */
-/* 		Ti = rexp(1/rate); */
-/* 		Ttot += Ti; */
-/* 		nodes[j]->time = Ttot; */
-
-/* 		// Make a number of mutations and sprinkle them out */
-/* 		int n_mut, l; */
-/* 		n_mut = (int) rpois((double) (theta / 2 * Ti)); */
-/* 		for (k=0; k<n_mut; k++) { */
-/* 			l = (int) runif(0.0, (double) i); */
-/* 			nodes[l]->mutations++; */
-/* 		} */
-/* 		printf("Time (tau) %.2f, time %.2f, n mutations: %i\n", Ti, Ttot, n_mut); */
-
-/* 		// Note that the coalescent event can be performed after */
-/* 		// setting the time and placing mutations as we know the id of */
-/* 		// the parent beforehand */
-/* 		coalesce(nodes, j, i, theta); */
-/* 		i--; */
-/* 		j++; */
-/* 	} */
-/* 	for (k=0; k<n_nodes; k++) */
-/* 		print_node(nodes[k]); */
-/* 	for (k=0; k<n_nodes; k++) { */
-/* 		if (isroot(nodes[k])) */
-/* 			print_node(nodes[k]); */
-/* 	} */
-	
-
-/* 	return 0; */
-/* } */
