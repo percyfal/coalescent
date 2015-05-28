@@ -59,18 +59,81 @@ struct Node *new_node (unsigned int id, unsigned int L)
 void delete_node (struct Node *n) 
 {
 	if (n != NULL) {
-		// n->parent = NULL;
-		//
-		// freeing n->parent from a leaf will also
-		// free the parent as n->parent itself is pointing to a
-		// pointer... so don't do this
-		// free (n->parent);
+		// freeing n->parent from a leaf apparently 
+		// frees the parent as n->parent itself is pointing to a
+		// pointer? ... so don't do this. 
+		//free (n->parent);
 		free (n->left);
 		free (n->right);
 		free (n->state);
 		free (n);
 	}
 }
+
+/** 
+ * isleaf - determine whether Node is leaf or not
+ * 
+ * @param n 
+ * 
+ * @return boolean
+ */
+boolean isleaf(struct Node *n) 
+{
+	return ((n->left == NULL) && (n->right == NULL)) ? TRUE : FALSE;
+}
+/** 
+ * isroot - determine whether Node is root or not
+ * 
+ * @param n 
+ * 
+ * @return boolean
+ */
+boolean isroot(struct Node *n) 
+{
+	return (n->parent == NULL) ? TRUE : FALSE;
+}
+/** 
+ * remove_tree - free up memory
+ *
+ * @param n - Node
+ */
+void remove_tree(struct Node *n)
+{
+	int ndel = 0;
+	boolean left = FALSE;
+	while (n != NULL) {
+		if (isleaf(n)) {
+			if (isroot(n)) {
+				ndel += 1;
+				delete_node(n);
+				n = NULL;
+			} else {
+				left = TRUE;
+				if (n->parent->left == NULL)
+					left = FALSE;
+				else if (n->parent->left->id != n->id)
+					left = FALSE;
+				n = n->parent;
+				(left == TRUE) ? delete_node(n->left) : delete_node(n->right);
+				if (left == TRUE) 
+					n->left = NULL;
+				else
+					n->right = NULL;
+				ndel += 1;
+			}
+		} else if (n->left != NULL) {
+			n = n->left;
+		} else if (n->right != NULL) {
+			n = n->right;
+		} else {
+			// Add error message?
+			n = NULL;
+		}
+	}
+	// debug macro wanted
+	// fprintf(stderr, "deleted %i nodes\n", ndel);
+}
+
 /** 
  * visit_node - a depth-first traversal of the tree
  * 
@@ -115,92 +178,6 @@ struct Node *unvisit_node (struct Node *n)
 		return NULL;
 	}
 }
-//struct Node
-
-
-/** 
- * print_node - print representation of Node
- * 
- * @param n 
- */
-void print_node(struct Node *n)
-{
-	printf("Node id: %i", n->id);
-	(n->parent == NULL) ? printf(", parent id: %p", n->parent) : printf(", parent id: %i", n->parent->id);
-	(n->left == NULL) ? printf(", left id: %p", n->left) : printf(", left id: %i", n->left->id);
-	(n->right == NULL) ? printf(", right id: %p", n->right) : printf(", right id: %i", n->right->id);
-	printf(", mutations: %i, time: %.2f, visited: %i\t", n->mutations, n->time, n->visited);
-	printf("%s\n", n->state);
-}
-/** 
- * coalesce - perform a coalescent event
- *
- * Two node indices are sampled from the current_sample_size. The node
- * at index node_census + 1
- * 
- * @param nodes - an array of all nodes in tree
- *
- * @param node_census - the highest node index that has been assigned
- *                      children/parents (initialized as number of leaves)
- * @param current_sample_size - the number of nodes to currently sample from
- * 
- */
-static void coalesce (struct Node* nodes[], unsigned int node_census, unsigned int current_sample_size, double theta)
-{
-	struct Node *tmp;
-	int i, j, parent_id, left, right;
-	parent_id = node_census;
-
-	// Select left child
-	left = (int) runif(0.0, (double) current_sample_size);
-	// swap left with last element in current_sample
-	tmp = nodes[current_sample_size - 1];
-	nodes[current_sample_size - 1] = nodes[left];
-	nodes[left] = tmp;
-	
-	// Select right child, sampling from current_sample_size - 1 nodes
-	right = (int) runif(0.0, (double) (current_sample_size - 1));
-	// swap right with parent
-	tmp = nodes[parent_id];
-	nodes[parent_id] = nodes[right];
-	nodes[right] = tmp;
-
-	// reset indices
-	parent_id = right;
-	left = current_sample_size - 1;
-	right = node_census;
-	
-	// Set parent to left and child to parent
-	nodes[left]->parent = nodes[parent_id];
-	nodes[parent_id]->left = nodes[left];
-	// Set parent to right and child to parent
-	nodes[right]->parent = nodes[parent_id];
-	nodes[parent_id]->right = nodes[right];
-}
-
-/** 
- * isleaf - determine whether Node is leaf or not
- * 
- * @param n 
- * 
- * @return boolean
- */
-boolean isleaf(struct Node *n) 
-{
-	return ((n->left == NULL) && (n->right == NULL)) ? TRUE : FALSE;
-}
-/** 
- * isroot - determine whether Node is root or not
- * 
- * @param n 
- * 
- * @return boolean
- */
-boolean isroot(struct Node *n) 
-{
-	return (n->parent == NULL) ? TRUE : FALSE;
-}
-
 /** 
  * reset_tree - mark all nodes as unvisited
  * 
@@ -215,39 +192,6 @@ void reset_tree(struct Node *n)
 		}
 	}
 }
-/** 
- * remove_tree - free up memory
- *
- * @param n - Node
- */
-void remove_tree(struct Node *n)
-{
-	boolean left = FALSE;
-	while (n != NULL) {
-		if (n->left != NULL) {
-			left = TRUE;
-			n = n->left;
-		} else if (n->right != NULL) {
-			left = FALSE;
-			n = n->right;
-		} else if (n->parent != NULL) {
-			n = n->parent;
-			if (left) {
-				delete_node(n->left);
-				n->left = NULL;
-			} else {
-				delete_node(n->right);
-				n->right = NULL;
-			}
-		}
-		else {
-			delete_node(n);
-			n = NULL;
-		}
-	}
-}
-
-
 /** 
  * segregating_sites - calculate the number of segregating sites
  * 
@@ -316,6 +260,52 @@ double tmrca(struct Node *n)
 		printf ("ERROR: %i is not root!\n", n->id);
 }
 /** 
+ * coalesce - perform a coalescent event
+ *
+ * Two node indices are sampled from the current_sample_size. The node
+ * at index node_census + 1
+ * 
+ * @param nodes - an array of all nodes in tree
+ *
+ * @param node_census - the highest node index that has been assigned
+ *                      children/parents (initialized as number of leaves)
+ * @param current_sample_size - the number of nodes to currently sample from
+ * 
+ */
+static void coalesce (struct Node* nodes[], unsigned int node_census, unsigned int current_sample_size, double theta)
+{
+	struct Node *tmp;
+	int i, j, parent_id, left, right;
+	parent_id = node_census;
+
+	// Select left child
+	left = (int) runif(0.0, (double) current_sample_size);
+	// swap left with last element in current_sample
+	tmp = nodes[current_sample_size - 1];
+	nodes[current_sample_size - 1] = nodes[left];
+	nodes[left] = tmp;
+	
+	// Select right child, sampling from current_sample_size - 1 nodes
+	right = (int) runif(0.0, (double) (current_sample_size - 1));
+	// swap right with parent
+	tmp = nodes[parent_id];
+	nodes[parent_id] = nodes[right];
+	nodes[right] = tmp;
+
+	// reset indices
+	parent_id = right;
+	left = current_sample_size - 1;
+	right = node_census;
+	
+	// Set parent to left and child to parent
+	nodes[left]->parent = nodes[parent_id];
+	nodes[parent_id]->left = nodes[left];
+	// Set parent to right and child to parent
+	nodes[right]->parent = nodes[parent_id];
+	nodes[parent_id]->right = nodes[right];
+}
+
+/** 
  * 
  * 
  * @param N number of samples
@@ -365,9 +355,6 @@ struct Node *coalescent_tree(unsigned int N, double theta, unsigned int L)
 		i--;
 		j++;
 	}
-	/* for (k=0; k < n_nodes; k++) { */
-	/* 	print_node(nodes[k]); */
-	/* } */
 	PutRNGstate();
 	for (k=0; k < n_nodes; k++) {
 		if (isroot(nodes[k]))
@@ -378,8 +365,9 @@ struct Node *coalescent_tree(unsigned int N, double theta, unsigned int L)
 /** 
  * tree - get the coalescent
  * 
- * @param N 
- * @param theta 
+ * @param N - sample size 
+ * @param theta - mutation rate
+ * @param L - sequence length
  * 
  * @return 
  */	
@@ -402,4 +390,18 @@ SEXP tree(SEXP N, SEXP theta, SEXP L)
 	// Clean up memory
 	remove_tree(n);
 	return (ans);
+}
+/** 
+ * print_node - print representation of Node
+ * 
+ * @param n 
+ */
+void print_node(struct Node *n)
+{
+	printf("Node id: %i", n->id);
+	(n->parent == NULL) ? printf(", parent id: %p", n->parent) : printf(", parent id: %i", n->parent->id);
+	(n->left == NULL) ? printf(", left id: %p", n->left) : printf(", left id: %i", n->left->id);
+	(n->right == NULL) ? printf(", right id: %p", n->right) : printf(", right id: %i", n->right->id);
+	printf(", mutations: %i, time: %.2f, visited: %i\t", n->mutations, n->time, n->visited);
+	printf("%s\n", n->state);
 }

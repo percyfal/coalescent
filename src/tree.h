@@ -27,6 +27,6 @@ struct Node {
 };
 
 
-	
+void print_node(struct Node *n);
 
 #endif
