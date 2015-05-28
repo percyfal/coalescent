@@ -4,14 +4,12 @@
 \alias{coalescent}
 \title{Coalescent simulation}
 \usage{
-coalescent(n = 10, theta = 1, L = 0)
+coalescent(n = 10, theta = 1)
 }
 \arguments{
 \item{int}{n number of samples}
 
 \item{double}{theta per generation mutation rate}
-
-\item{int}{L fragment size}
 }
 \value{
 vector containing TMRCA, TBL, S_n

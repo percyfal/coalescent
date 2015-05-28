@@ -2,8 +2,7 @@
 #'
 #' @param int n number of samples
 #' @param double theta per generation mutation rate
-#' @param int L fragment size
-#'
+#' 
 #' @return vector containing TMRCA, TBL, S_n
 #'
 coalescent <- function(n=10, theta=1.0) {
