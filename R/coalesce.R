@@ -6,7 +6,7 @@
 #'
 #' @return vector containing TMRCA, TBL, S_n
 #'
-coalescent <- function(n=10, theta=1.0, L=0) {
-    l <- .Call("tree", n, theta, L)
+coalescent <- function(n=10, theta=1.0) {
+    l <- .Call("tree", n, theta)
     return (c(tmrca=l[[1]], tbl=l[[2]], nmut=l[[3]]))
 }

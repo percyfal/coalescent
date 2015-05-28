@@ -26,7 +26,7 @@
  * 
  * @return Node
  */
-struct Node *new_node (unsigned int id, unsigned int L)
+struct Node *new_node (unsigned int id)
 {
 	struct Node *retval = malloc (sizeof (struct Node));
 	if (retval == NULL)
@@ -41,14 +41,6 @@ struct Node *new_node (unsigned int id, unsigned int L)
 	retval->time = 0.0;
 	retval->id = id;
 	retval->visited = FALSE;
-	// here we go with chars again - there must be an easier way to do
-	// this
-	retval->state = malloc(sizeof(char)*(L+1));
-	char state [L];
-	strcpy(state, "");
-	for (int i=0; i<L; i++)
-		strcat(state, "0");
-	strcpy(retval->state, state);
 	return retval;
 }
 /** 
@@ -65,7 +57,6 @@ void delete_node (struct Node *n)
 		//free (n->parent);
 		free (n->left);
 		free (n->right);
-		free (n->state);
 		free (n);
 	}
 }
@@ -310,11 +301,10 @@ static void coalesce (struct Node* nodes[], unsigned int node_census, unsigned i
  * 
  * @param N number of samples
  * @param theta mutation rate
- * @param L number of sites
  * 
  * @return root node
  */
-struct Node *coalescent_tree(unsigned int N, double theta, unsigned int L)
+struct Node *coalescent_tree(unsigned int N, double theta)
 {
 	// http://users.stat.umn.edu/~geyer/rc/
 	GetRNGstate();
@@ -324,7 +314,7 @@ struct Node *coalescent_tree(unsigned int N, double theta, unsigned int L)
 	n_nodes = 2*N - 1;
 	struct Node *nodes[n_nodes];
 	for (k=0; k < n_nodes; k++)
-		nodes[k] = new_node(k, L);
+		nodes[k] = new_node(k);
 	
 	double rate, Ti, Ttot;
 	Ttot = 0.0;
@@ -367,18 +357,17 @@ struct Node *coalescent_tree(unsigned int N, double theta, unsigned int L)
  * 
  * @param N - sample size 
  * @param theta - mutation rate
- * @param L - sequence length
  * 
  * @return 
  */	
-SEXP tree(SEXP N, SEXP theta, SEXP L)
+SEXP tree(SEXP N, SEXP theta)
 {
 	SEXP ans;
 	SEXP TMRCA = PROTECT(allocVector(REALSXP, 1));
 	SEXP TBL = PROTECT(allocVector(REALSXP, 1));
 	SEXP NMUT = PROTECT(allocVector(INTSXP, 1));
 	struct Node *n;
-	n = coalescent_tree(asInteger(N), asReal(theta), asInteger(L));
+	n = coalescent_tree(asInteger(N), asReal(theta));
 	ans = PROTECT(allocVector(VECSXP, 3));
 	NMUT = ScalarInteger(segregating_sites(n));
 	TMRCA = ScalarReal(tmrca(n));
@@ -403,5 +392,4 @@ void print_node(struct Node *n)
 	(n->left == NULL) ? printf(", left id: %p", n->left) : printf(", left id: %i", n->left->id);
 	(n->right == NULL) ? printf(", right id: %p", n->right) : printf(", right id: %i", n->right->id);
 	printf(", mutations: %i, time: %.2f, visited: %i\t", n->mutations, n->time, n->visited);
-	printf("%s\n", n->state);
 }
