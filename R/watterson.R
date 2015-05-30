@@ -18,8 +18,6 @@ watterson <- function(Sn, n) {
 #' @return theta_w for each fragment
 #'
 estimate_watterson <- function(x=10, n=100, L=200, theta=0.01) {
-    # NB: fragment size is not used in coalescent function as we're
-    # not generating the character states
     d <- as.data.frame(
         do.call("rbind",
                 lapply(seq(1, x),
