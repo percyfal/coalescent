@@ -22,7 +22,7 @@ estimate_watterson <- function(x=10, n=100, L=200, theta=0.01) {
         do.call("rbind",
                 lapply(seq(1, x),
                        function(y) {
-                           c(fragment=y, coalescent(n=n, theta = theta*L))
+                           c(fragment=y, coalescent(n=n, theta = theta*L)$data)
                        }
                        ))
     )

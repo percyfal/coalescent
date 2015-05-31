@@ -15,6 +15,10 @@ typedef int boolean;
 #define TRUE 1
 #define FALSE 0
 
+// http://stackoverflow.com/questions/8257714/how-to-convert-an-int-to-string-in-c
+// #define MAX_INT_CHARSIZE ((CHAR_BIT * sizeof(int) - 1) / 3 + 2)
+#define NEWICK_BUFSIZE 10
+
 struct Node {
 	struct Node *parent;
 	struct Node *left;
@@ -23,7 +27,6 @@ struct Node {
 	unsigned int mutations;
 	unsigned int id;
 	boolean visited;
-	char *state;
 };
 
 

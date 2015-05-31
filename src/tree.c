@@ -10,12 +10,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <string.h>
 /* See http://stat-www.berkeley.edu/classes/s243/rmath.html for instructions on compiling standalone */
 // #define MATHLIB_STANDALONE
 #include "R.h"
 #include "Rmath.h"
 #include "Rinternals.h"
-
 #include "tree.h"
 
 /* http://stackoverflow.com/questions/14768230/malloc-for-struct-and-pointer-in-c */
@@ -51,16 +51,15 @@ struct Node *new_node (unsigned int id)
 void delete_node (struct Node *n) 
 {
 	if (n != NULL) {
-		// freeing n->parent from a leaf apparently 
-		// frees the parent as n->parent itself is pointing to a
-		// pointer? ... so don't do this. 
-		//free (n->parent);
+		// freeing n->parent from a node obviously frees the parent as
+		// n->parent ... so don't do this. For the root node, n-parent
+		// points to NULL anyways.
+		// free (n->parent);
 		free (n->left);
 		free (n->right);
 		free (n);
 	}
 }
-
 /** 
  * isleaf - determine whether Node is leaf or not
  * 
@@ -86,6 +85,12 @@ boolean isroot(struct Node *n)
 /** 
  * remove_tree - free up memory
  *
+ * Traverse tree in a depth-first fashion. Delete a node if it is a
+ * leaf, keeping track of whether the node is a left child of its
+ * parent. Set current node to the parent and delete the child. Note
+ * that we cannot use the visit_node function as we delete nodes
+ * during tree traversal
+ *
  * @param n - Node
  */
 void remove_tree(struct Node *n)
@@ -99,13 +104,17 @@ void remove_tree(struct Node *n)
 				delete_node(n);
 				n = NULL;
 			} else {
+				// Is current node left child of parent?
 				left = TRUE;
 				if (n->parent->left == NULL)
 					left = FALSE;
 				else if (n->parent->left->id != n->id)
 					left = FALSE;
+				// set current node to parent and delete the relevant
+				// child (=previously the current node)
 				n = n->parent;
 				(left == TRUE) ? delete_node(n->left) : delete_node(n->right);
+				// finally, reset the pointer to the deleted child to NULL
 				if (left == TRUE) 
 					n->left = NULL;
 				else
@@ -117,14 +126,12 @@ void remove_tree(struct Node *n)
 		} else if (n->right != NULL) {
 			n = n->right;
 		} else {
-			// Add error message?
 			n = NULL;
 		}
 	}
 	// debug macro wanted
 	// fprintf(stderr, "deleted %i nodes\n", ndel);
 }
-
 /** 
  * visit_node - a depth-first traversal of the tree
  * 
@@ -143,7 +150,6 @@ struct Node *visit_node (struct Node *n)
 		return n->parent;
 	}
 	else {
-		//Rprintf("all nodes have been visited; returning null\n");
 		return NULL;
 	}
 }
@@ -165,7 +171,6 @@ struct Node *unvisit_node (struct Node *n)
 		return n->parent;
 	}
 	else {
-		//Rprintf("all nodes have been unvisited; returning null\n");
 		return NULL;
 	}
 }
@@ -194,12 +199,9 @@ int segregating_sites(struct Node *n)
 {
 	int sites = 0;
 	reset_tree(n);
-	//Rprintf("calculating segregating sites\n");
 	while (n != NULL) {
 		if (n != NULL) {
-			//Rprintf("id: %i, mutations: %i, visited: %i\n", n->id, n->mutations, n->visited);
 			if (!n->visited) {
-				//Rprintf("Adding %i mutations from id %i\n", n->mutations, n->id);
 				n->visited = TRUE;
 				sites += n->mutations;
 			}
@@ -209,9 +211,11 @@ int segregating_sites(struct Node *n)
 	return sites;
 }
 /** 
- * total_branch_length - calculate the total branch length. As each
- * node has recorded a coalescent event at the *total* time point, we
- * need to add the *differences* in time between node and its parent
+ * total_branch_length - calculate the total branch length.
+ *
+ * As each node has recorded a coalescent event at the *total* time
+ * point, we need to add the *differences* in time between node and
+ * its parent
  * 
  * @param n - Node
  * 
@@ -221,12 +225,9 @@ double total_branch_length(struct Node *n)
 {
 	double tbl = 0.0;
 	reset_tree(n);
-	//Rprintf("calculating tbl...\n");
 	while (n != NULL) {
 		if (n != NULL) {
-			//Rprintf("id: %i, tbl: %.3f, visited: %i\n", n->id, n->time, n->visited);
 			if (!n->visited && n->parent != NULL) {
-				//Rprintf("Adding time %.3f  from id %i\n", n->parent->time - n->time, n->id);
 				n->visited = TRUE;
 				tbl += n->parent->time - n->time;
 			}
@@ -237,7 +238,7 @@ double total_branch_length(struct Node *n)
 }
 /** 
  * tmrca - calculate time to most recent common ancestor. This is
- * simply the time recorded in the parent node
+ * simply the time recorded in the root node
  * 
  * @param n 
  * 
@@ -248,7 +249,36 @@ double tmrca(struct Node *n)
 	if (isroot(n))
 		return n->time;
 	else
-		printf ("ERROR: %i is not root!\n", n->id);
+		fprintf (stderr, "ERROR: %i is not root!\n", n->id);
+}
+/** 
+ * newick - get newick string representation for a node
+ * 
+ * @param n - node for which newick representation is desired
+ * 
+ * @return recursively generate newick string representation of node
+ * and its descendants
+ */
+char *newick(struct Node *n)
+{
+	char *retval;
+	if (isleaf(n)) {
+		retval = malloc (sizeof (char) * NEWICK_BUFSIZE);
+		snprintf(retval, NEWICK_BUFSIZE, "%i:%.4f", n->id, n->parent->time - n->time);
+	} else {
+		char *left, *right;
+		left = newick(n->left);
+		right = newick(n->right);
+		int BUFSIZE = strlen(left) + strlen(right) + 12;		
+		retval = malloc (sizeof (char) * BUFSIZE);
+		if (isroot(n))
+			snprintf(retval, BUFSIZE, "(%s,%s):%.i;", left, right, n->id);
+		else
+			snprintf(retval, BUFSIZE, "(%s,%s):%.4f", left, right, n->parent->time - n->time);
+		free(left);
+		free(right);
+	}
+	return retval;
 }
 /** 
  * coalesce - perform a coalescent event
@@ -257,13 +287,12 @@ double tmrca(struct Node *n)
  * at index node_census + 1
  * 
  * @param nodes - an array of all nodes in tree
- *
  * @param node_census - the highest node index that has been assigned
  *                      children/parents (initialized as number of leaves)
  * @param current_sample_size - the number of nodes to currently sample from
  * 
  */
-static void coalesce (struct Node* nodes[], unsigned int node_census, unsigned int current_sample_size, double theta)
+static void coalesce (struct Node* nodes[], unsigned int node_census, unsigned int current_sample_size)
 {
 	struct Node *tmp;
 	int i, j, parent_id, left, right;
@@ -303,6 +332,7 @@ static void coalesce (struct Node* nodes[], unsigned int node_census, unsigned i
  * @param theta mutation rate
  * 
  * @return root node
+ * 
  */
 struct Node *coalescent_tree(unsigned int N, double theta)
 {
@@ -341,10 +371,11 @@ struct Node *coalescent_tree(unsigned int N, double theta)
 		// Note that the coalescent event can be performed after
 		// setting the time and placing mutations as we know the id of
 		// the parent beforehand
-		coalesce(nodes, j, i, theta);
+		coalesce(nodes, j, i);
 		i--;
 		j++;
 	}
+
 	PutRNGstate();
 	for (k=0; k < n_nodes; k++) {
 		if (isroot(nodes[k]))
@@ -357,33 +388,46 @@ struct Node *coalescent_tree(unsigned int N, double theta)
  * 
  * @param N - sample size 
  * @param theta - mutation rate
+ * @param get_newick - get newick representation
  * 
- * @return 
+ * @return SEXP vector containing TMRCA, TBL, S_n and possibly newick
+ * representation of tree
+ * 
  */	
-SEXP tree(SEXP N, SEXP theta)
+SEXP tree(SEXP N, SEXP theta, SEXP get_newick)
 {
-	SEXP ans;
+	SEXP ans, NEWICK;
 	SEXP TMRCA = PROTECT(allocVector(REALSXP, 1));
 	SEXP TBL = PROTECT(allocVector(REALSXP, 1));
 	SEXP NMUT = PROTECT(allocVector(INTSXP, 1));
 	struct Node *n;
 	n = coalescent_tree(asInteger(N), asReal(theta));
-	ans = PROTECT(allocVector(VECSXP, 3));
+	char *newick_ptr = "NA";
+	if ((boolean) asInteger(get_newick))
+		newick_ptr = newick(n);
+	PROTECT(NEWICK = allocVector(STRSXP, 1));
+	SET_STRING_ELT(NEWICK, 0, mkChar(newick_ptr));
+
+	ans = PROTECT(allocVector(VECSXP, 4));
 	NMUT = ScalarInteger(segregating_sites(n));
 	TMRCA = ScalarReal(tmrca(n));
 	TBL = ScalarReal(total_branch_length(n));
+	
 	SET_VECTOR_ELT(ans, 0, TMRCA);
 	SET_VECTOR_ELT(ans, 1, TBL);
 	SET_VECTOR_ELT(ans, 2, NMUT);
-    UNPROTECT(4);
+	SET_VECTOR_ELT(ans, 3, NEWICK);
+    UNPROTECT(5);
 	// Clean up memory
 	remove_tree(n);
 	return (ans);
 }
+
 /** 
  * print_node - print representation of Node
  * 
  * @param n 
+ * 
  */
 void print_node(struct Node *n)
 {
