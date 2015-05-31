@@ -9,5 +9,9 @@
 #'
 coalescent <- function(n=10, theta=1.0, newick=FALSE) {
     l <- .Call("tree", n, theta, newick)
-    return (as.list(c(tmrca=l[[1]], tbl=l[[2]], nmut=l[[3]], newick=l[[4]])))
+    return (list(tmrca=as.double(l[[1]]),
+                 tbl=as.double(l[[2]]),
+                 nmut=as.integer(l[[3]]),
+                 newick=as.character(l[[4]]))
+            )
 }
