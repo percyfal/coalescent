@@ -330,11 +330,13 @@ static void coalesce (struct Node* nodes[], unsigned int node_census, unsigned i
  * 
  * @param N number of samples
  * @param theta mutation rate
+ * @param Tb "bottleneck" time
+ * @param f fraction of bottleneck population compared to current
  * 
  * @return root node
  * 
  */
-struct Node *coalescent_tree(unsigned int N, double theta)
+struct Node *coalescent_tree(unsigned int N, double theta, double Tb, double f)
 {
 	// http://users.stat.umn.edu/~geyer/rc/
 	GetRNGstate();
@@ -352,8 +354,15 @@ struct Node *coalescent_tree(unsigned int N, double theta)
 	while (i > 1) {
 		// Set the coalescence time
 		rate = i * (i - 1) / 2.0;
-		/* rate is in unit 1/s; want unit s so invert */
 		Ti = rexp(1/rate);
+		if (f != 1.0) {
+			// this part models expansion/bottleneck
+			if (Ttot > Tb) {
+				rate = f * i * (i - 1) / 2.0;
+				Ti = rexp(1/rate) + Tb;
+			}
+		}
+		/* rate is in unit 1/s; want unit s so invert */
 		Ttot += Ti;
 		nodes[j]->time = Ttot;
 
@@ -389,19 +398,26 @@ struct Node *coalescent_tree(unsigned int N, double theta)
  * @param N - sample size 
  * @param theta - mutation rate
  * @param get_newick - get newick representation
+ *
+ * @param Tb - time for population "bottleneck" (can also model
+ * expansion; see parameter f)
+ *
+ * @param f - fraction of population size at Tb compared to current
+ * size N_0; in other words, N_b = f * N_0. When f>1 a bottleneck is
+ * modelled, when f<1 an expansion
  * 
  * @return SEXP vector containing TMRCA, TBL, S_n and possibly newick
  * representation of tree
  * 
  */	
-SEXP tree(SEXP N, SEXP theta, SEXP get_newick)
+SEXP tree(SEXP N, SEXP theta, SEXP get_newick, SEXP Tb, SEXP f)
 {
 	SEXP ans, NEWICK;
 	SEXP TMRCA = PROTECT(allocVector(REALSXP, 1));
 	SEXP TBL = PROTECT(allocVector(REALSXP, 1));
 	SEXP NMUT = PROTECT(allocVector(INTSXP, 1));
 	struct Node *n;
-	n = coalescent_tree(asInteger(N), asReal(theta));
+	n = coalescent_tree(asInteger(N), asReal(theta), asReal(Tb), asReal(f));
 	char *newick_ptr = "NA";
 	if ((boolean) asInteger(get_newick))
 		newick_ptr = newick(n);

@@ -1,7 +1,7 @@
 Package: coalescent
 Type: Package
 Title: Coalescent simulation functions
-Version: 0.3.3
+Version: 0.3.4
 Date: 2015-05-30
 Author: Per Unneberg
 Maintainer: <per.unneberg@scilifelab.se>
