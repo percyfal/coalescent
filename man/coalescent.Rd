@@ -4,15 +4,18 @@
 \alias{coalescent}
 \title{Coalescent simulation}
 \usage{
-coalescent(n = 10, theta = 1)
+coalescent(n = 10, theta = 1, newick = FALSE)
 }
 \arguments{
-\item{int}{n number of samples}
+\item{n}{number of samples}
 
-\item{double}{theta per generation mutation rate}
+\item{theta}{per generation mutation rate}
+
+\item{newick}{logical; return newick string representation of tree}
 }
 \value{
-vector containing TMRCA, TBL, S_n
+vector containing TMRCA, TBL, S_n, and possibly newick
+    representation of tree
 }
 \description{
 Coalescent simulation
