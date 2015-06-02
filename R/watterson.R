@@ -17,12 +17,12 @@ watterson <- function(Sn, n) {
 #'
 #' @return theta_w for each fragment
 #'
-estimate_watterson <- function(x=10, n=100, L=200, theta=0.01) {
+estimate_watterson <- function(x=10, n=100, L=200, theta=0.01, ...) {
     d <- as.data.frame(
         do.call("rbind",
                 lapply(seq(1, x),
                        function(y) {
-                           c(fragment=y, coalescent(n=n, theta = theta*L)$data)
+                           c(fragment=y, coalescent(n=n, theta = theta*L, ...)$data)
                        }
                        ))
     )
